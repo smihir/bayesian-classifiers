@@ -9,9 +9,14 @@ class Vertex:
     def __init__(self, id):
         self.id = id
         self.neighbors = dict()
+        # parents are used for quick lookups in directed graphs
+        self.parents = list()
 
     def add_neighbor(self, v, weight = 0):
         self.neighbors[v] = weight
+
+    def add_parent(self, p):
+        self.parents.append(p)
 
     def get_neighbor_weight(self, v):
         if self.neighbors.has_key(v):
@@ -55,6 +60,9 @@ class Graph:
 
         if not self.directed:
             v2.add_neighbor(v1, cost)
+        else:
+            v2.add_parent(v1)
+
 
 class Tan:
     def __init__(self, fname):
@@ -79,8 +87,6 @@ class Tan:
 
         self.create_bayes_net()
         self.find_maximum_spanning_tree()
-
-
 
     def make_attribute_dictionary(self):
         for attr in self.raw_data['attributes']:
@@ -125,8 +131,12 @@ class Tan:
 
     def find_maximum_spanning_tree(self):
         self.spanning_tree = Graph(directed = True)
-        Q = copy.deepcopy(self.bayes_net.adjacency_list)
-        self.spanning_tree.add_vertex(Q.pop(0).id)
+        Q = list()
+        for v in self.raw_data['attributes']:
+            if v[0] == self.raw_data['attributes'][-1][0]:
+                continue
+            Q.append(v[0])
+        self.spanning_tree.add_vertex(Q.pop(0))
 
         while True:
             if len(Q) == 0:
@@ -136,14 +146,14 @@ class Tan:
             for vertex in self.spanning_tree.adjacency_list:
                 for q_vertex in Q:
                     bn_vertex_a = self.bayes_net.get_vertex_by_id(vertex.id)
-                    bn_vertex_q = self.bayes_net.get_vertex_by_id(q_vertex.id)
+                    bn_vertex_q = self.bayes_net.get_vertex_by_id(q_vertex)
                     val = bn_vertex_a.get_neighbor_weight(bn_vertex_q)
                     if val > max_weight:
                         max_weight = val
                         next_vertex = q_vertex
                         parent_vertex = vertex
-            self.spanning_tree.add_vertex(next_vertex.id)
-            self.spanning_tree.add_edge_by_id(parent_vertex.id, next_vertex.id, max_weight)
+            self.spanning_tree.add_vertex(next_vertex)
+            self.spanning_tree.add_edge_by_id(parent_vertex.id, next_vertex, max_weight)
             Q.remove(next_vertex)
             #print(self.attribute_no_lookup[parent_vertex.id], self.attribute_no_lookup[next_vertex.id])
 
@@ -179,6 +189,18 @@ class Tan:
 
         return conditional_count / total
 
+    def conditional_probability_by2(self, fname1, fval1, pname, pval, classifierval, classifier = 'class',
+                                    laplace = True):
+        total = len([1 for d in self.data if d[classifier] == classifierval and d[pname] == pval])
+        conditional_count = len([1 for d in self.data if d[classifier] == classifierval and d[pname] == pval and
+                                d[fname1] == fval1])
+
+        if laplace:
+            conditional_count += 1
+            total += len(self.attribute_dictionary[fname1])
+
+        return conditional_count / total
+
 
     def probability(self, fname, fval, laplace = True):
         """
@@ -208,7 +230,53 @@ class Tan:
 
         return count / total
 
+    def classify(self, testf):
+        classifier = self.raw_data['attributes'][-1][0]
+
+        for v in self.raw_data['attributes']:
+            if v[0] == classifier:
+                continue
+            if len(self.spanning_tree.get_vertex_by_id(v[0]).parents) == 0:
+                print(v[0] + " " + classifier)
+            else:
+                parentkey = self.spanning_tree.get_vertex_by_id(v[0]).parents[0].id
+                print(v[0] + " " + parentkey + " " + classifier)
+        print("")
+
+        with open(testf) as f:
+            self.raw_test_data = self.arff.load(f)
+        self.test_data = copy.deepcopy(self.process_raw_data(self.raw_test_data['data']))
+
+        p = dict()
+        correct = 0
+        for v in self.raw_data['attributes'][-1][1]:
+            p[v] = self.probability(classifier, v)
+
+        for td in self.test_data:
+            cplist = dict()
+            for ckey, cval in p.iteritems():
+                cp = cval
+                for key, value in td.iteritems():
+                    if key == classifier:
+                        continue
+                    if len(self.spanning_tree.get_vertex_by_id(key).parents) == 0:
+                        cp *= self.conditional_probability(key, value, ckey, classifier)
+                    else:
+                        parentkey = self.spanning_tree.get_vertex_by_id(key).parents[0].id
+                        parentval = td[parentkey]
+                        cp *= self.conditional_probability_by2(key, value, parentkey, parentval, ckey, classifier)
+
+                cplist[ckey] = cp
+
+            tval = sum(map(lambda (x, y): y, cplist.iteritems()))
+            mval = max(cplist.iteritems(), key=operator.itemgetter(1))
+
+            if mval[0] == td[classifier]:
+                correct += 1
+            print(mval[0] + ' ' + td[classifier] + str(" %.12f" %(mval[1] / tval)))
+        print("\n" + str(correct))
 
 if __name__ == "__main__":
     t = Tan(sys.argv[1])
+    t.classify(sys.argv[2])
     print("Done")
