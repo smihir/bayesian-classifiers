@@ -137,22 +137,15 @@ class Tan:
                 for q_vertex in Q:
                     bn_vertex_a = self.bayes_net.get_vertex_by_id(vertex.id)
                     bn_vertex_q = self.bayes_net.get_vertex_by_id(q_vertex.id)
-
-
-                    #if not bn_vertex_a.is_connected(bn_vertex_q):
-                    #    continue
-
                     val = bn_vertex_a.get_neighbor_weight(bn_vertex_q)
-                    #print ("consider " + vertex.id + " " + q_vertex.id + " " + str("%.12f" %val))
                     if val > max_weight:
                         max_weight = val
                         next_vertex = q_vertex
                         parent_vertex = vertex
-                        #print ("MAX " + vertex.id + " " + q_vertex.id + " ")
             self.spanning_tree.add_vertex(next_vertex.id)
             self.spanning_tree.add_edge_by_id(parent_vertex.id, next_vertex.id, max_weight)
             Q.remove(next_vertex)
-            print(self.attribute_no_lookup[parent_vertex.id], self.attribute_no_lookup[next_vertex.id])
+            #print(self.attribute_no_lookup[parent_vertex.id], self.attribute_no_lookup[next_vertex.id])
 
 
     def conditional_probability(self, fname, fval, classifierval, classifier = 'class', laplace = True):
