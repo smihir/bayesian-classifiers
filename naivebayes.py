@@ -122,7 +122,7 @@ class NaiveBayes:
 
             if mval[0] == td[classifier]:
                 correct += 1
-            print(mval[0] + ' ' + td[classifier] + str(" %.12f" %(mval[1] / tval)))
+            print(mval[0] + ' ' + td[classifier] + str(" %.12f" %(mval[1] / tval)).rstrip('0'))
         print("\n" + str(correct))
         return correct, len(self.raw_test_data['data'])
 
