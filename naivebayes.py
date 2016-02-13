@@ -90,11 +90,17 @@ class NaiveBayes:
         return count / total
 
     def classify(self, testf):
+        classifier = self.raw_data['attributes'][-1][0]
+        for v in self.raw_data['attributes']:
+            if v[0] == classifier:
+                continue
+            print(v[0] + " " + classifier)
+        print("")
+
         with open(testf) as f:
             self.raw_test_data = self.arff.load(f)
         self.test_data = copy.deepcopy(self.process_raw_data(self.raw_test_data['data']))
 
-        classifier = self.raw_data['attributes'][-1][0]
         p = dict()
         correct = 0
         for v in self.raw_data['attributes'][-1][1]:
