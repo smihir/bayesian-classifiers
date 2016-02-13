@@ -2,6 +2,7 @@ from __future__ import division
 import copy
 import sys
 import operator
+import random
 
 class NaiveBayes:
     """This is the Naive Bayes classifier
@@ -14,21 +15,30 @@ class NaiveBayes:
     Classification begins with the call to classify() method with
     the test arff file as the input argument.
     """
-    def __init__(self, fname):
+    def __init__(self, fname, evaluate = False):
         self.arff = __import__("arff")
         self.data = None
         self.raw_test_data = None
         self.test_data = None
-        self.model = dict()
         self.attribute_dictionary = dict()
         with open(fname) as f:
-            self.raw_data = self.arff.load(f)
-
-        self.data = copy.deepcopy(self.process_raw_data(self.raw_data['data']))
+            self.eval_data = self.arff.load(f)
         self.make_attribute_dictionary()
 
+        if not evaluate:
+            self.raw_data = copy.deepcopy(self.eval_data)
+            self.generate_model()
+
+    def generate_model(self):
+        self.data = copy.deepcopy(self.process_raw_data(self.raw_data['data']))
+
+    def clean_training_data(self):
+        self.data = None
+        self.raw_test_data = None
+        self.test_data = None
+
     def make_attribute_dictionary(self):
-        for attr in self.raw_data['attributes']:
+        for attr in self.eval_data['attributes']:
             self.attribute_dictionary[attr[0]] = attr[1]
 
     def process_raw_data(self, raw_data):
@@ -108,6 +118,29 @@ class NaiveBayes:
                 correct += 1
             print(mval[0] + ' ' + td[classifier] + str(" %.12f" %(mval[1] / tval)))
         print("\n" + str(correct))
+        return correct, len(self.raw_test_data['data'])
+
+    def evaluate(self, tname):
+        random.seed(100)
+        #ratios = [0.25, 0.5, 1]
+        ratios = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        result = list()
+
+        self.raw_data = dict()
+        self.raw_data['attributes'] = self.eval_data['attributes']
+        for r in ratios:
+            run = list()
+            for c in range(1, 5):
+                rindex = random.sample(range(0, len(self.eval_data['data'])), int(r * len(self.eval_data['data'])))
+                self.clean_training_data()
+                self.raw_data['data'] = list()
+                for i in rindex:
+                    self.raw_data['data'].append(self.eval_data['data'][i])
+                self.generate_model()
+                correct, total = self.classify(tname)
+                run.append((correct, total, int(r * len(self.eval_data['data']))))
+            result.append(run)
+        return result
 
 if __name__ == "__main__":
     nb = NaiveBayes(sys.argv[1])

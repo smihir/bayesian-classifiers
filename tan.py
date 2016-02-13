@@ -4,6 +4,7 @@ import sys
 import itertools
 import math
 import operator
+import random
 
 class Vertex:
     def __init__(self, id):
@@ -63,33 +64,43 @@ class Graph:
         else:
             v2.add_parent(v1)
 
-
 class Tan:
-    def __init__(self, fname):
+    def __init__(self, fname, evaluate = False):
         self.arff = __import__("arff")
         self.data = None
         self.raw_test_data = None
         self.test_data = None
-        self.model = dict()
         self.attribute_dictionary = dict()
         self.bayes_net = Graph()
         self.spanning_tree = None
         self.attribute_no_lookup = dict()
         with open(fname) as f:
-            self.raw_data = self.arff.load(f)
+            self.eval_data = self.arff.load(f)
 
         i = 0
-        for v in self.raw_data['attributes']:
+        for v in self.eval_data['attributes']:
             self.attribute_no_lookup[v[0]] = i
             i += 1
         self.make_attribute_dictionary()
-        self.data = copy.deepcopy(self.process_raw_data(self.raw_data['data']))
 
+        if not evaluate:
+            self.raw_data = copy.deepcopy(self.eval_data)
+            self.generate_model()
+
+    def generate_model(self):
+        self.data = copy.deepcopy(self.process_raw_data(self.raw_data['data']))
         self.create_bayes_net()
         self.find_maximum_spanning_tree()
 
+    def clean_training_data(self):
+        self.data = None
+        self.raw_test_data = None
+        self.test_data = None
+        self.bayes_net = Graph()
+        self.spanning_tree = None
+
     def make_attribute_dictionary(self):
-        for attr in self.raw_data['attributes']:
+        for attr in self.eval_data['attributes']:
             self.attribute_dictionary[attr[0]] = attr[1]
 
     def process_raw_data(self, raw_data):
@@ -275,8 +286,30 @@ class Tan:
                 correct += 1
             print(mval[0] + ' ' + td[classifier] + str(" %.12f" %(mval[1] / tval)))
         print("\n" + str(correct))
+        return correct, len(self.raw_test_data['data'])
+
+    def evaluate(self, tname):
+        random.seed(100)
+        #ratios = [0.25, 0.5, 1]
+        ratios = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        result = list()
+
+        self.raw_data = dict()
+        self.raw_data['attributes'] = self.eval_data['attributes']
+        for r in ratios:
+            run = list()
+            for c in range(1, 5):
+                rindex = random.sample(range(0, len(self.eval_data['data'])), int(r * len(self.eval_data['data'])))
+                self.clean_training_data()
+                self.raw_data['data'] = list()
+                for i in rindex:
+                    self.raw_data['data'].append(self.eval_data['data'][i])
+                self.generate_model()
+                correct, total = self.classify(tname)
+                run.append((correct, total, int(r * len(self.eval_data['data']))))
+            result.append(run)
+        return result
 
 if __name__ == "__main__":
     t = Tan(sys.argv[1])
     t.classify(sys.argv[2])
-    print("Done")
